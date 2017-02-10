@@ -4,51 +4,54 @@ import re
 
 # extract configured set of features from list of text instances
 
-# global variables to pass around
-source_text = []
-stemmed_text = []
+# global variables to pass around data
+source_texts = []
+stemmed_texts = []
 
 
 def preprocess():
-    # first stem and lowercase words, then remove rare words
-    # lowercase
-    global source_text
-    source_text = [text.lower() for text in source_text]
+    """ prepares source_texts for feature extraction; called by extract_features
 
-    # tokenize
-    tokenized_text = [nltk.word_tokenize(text) for text in source_text]
+    puts words in lower case, tokenizes and stems them, and removes rare words
+    no args and no return because of use of global variables
+    """
+    # lower case and tokenize
+    global source_texts
+    source_texts = [text.lower() for text in source_texts]
+    tokenized_texts = [nltk.word_tokenize(text) for text in source_texts]
 
-    # stem
+    # stem using standard nltk porter stemmer
     porter = nltk.PorterStemmer()
-    global stemmed_text
-    # stemmed_text = [[porter.stem(t) for t in tokens]
-    #                 for tokens in tokenized_text]
+    global stemmed_texts
+    # stemmed_texts = [[porter.stem(t) for t in tokens]
+    #                 for tokens in tokenized_texts]
     # iterating instead of list comprehension to allow exception handling
-    for tokens in tokenized_text:
+    for tokens in tokenized_texts:
         stemmed_line = []
         for t in tokens:
             try:
                 stemmed_line.extend(porter.stem(t))
             except IndexError:
                 stemmed_line.extend('')
-        stemmed_text.append(stemmed_line)
+        stemmed_texts.append(stemmed_line)
 
     # remove rare words
-    # vocab = nltk.FreqDist(w for w in line for line in stemmed_text)
-    vocab = nltk.FreqDist(w for line in stemmed_text for w in line)
-    rarewords_list = vocab.hapaxes()
-    rarewords_regex = re.compile(r'\b(%s)\b' % '|'.join(rarewords_list))
-    stemmed_text = [[rarewords_regex.sub('<RARE>', w) for w in line]
-                    for line in stemmed_text]
-    # note that source_text will be lowercased, but only stemmed_text will have
+    # vocab = nltk.FreqDist(w for w in line for line in stemmed_texts)
+    vocab = nltk.FreqDist(w for line in stemmed_texts for w in line)
+    rare_words_list = vocab.hapaxes()
+    rare_words_regex = re.compile(r'\b(%s)\b' % '|'.join(rare_words_list))
+    stemmed_texts = [[rare_words_regex.sub('<RARE>', w) for w in line]
+                     for line in stemmed_texts]
+    # note: source_texts will be lower case, but only stemmed_texts will have
     # rare words removed
 
 
 def bag_of_function_words():
+    """ returns, for each nltk stop word, count per text in source_texts """
     bow = []
     for sw in nltk.corpus.stopwords.words('english'):
-        counts = [sum(1 for _ in re.finditer(r'\b%s\b' % sw, line))
-                  for line in source_text]
+        counts = [sum(1 for _ in re.finditer(r'\b%s\b' % sw, text))
+                  for text in source_texts]
         bow.append(counts)
     return bow
 
@@ -56,12 +59,22 @@ def bag_of_function_words():
 # FILL IN OTHER FEATURE EXTRACTORS
 
 
-def extract_features(text, conf):
+def extract_features(texts, conf):
+    """ extracts features in given conf from each text in given list of texts
+
+    args:
+        text: list of texts (essays) from which to extract features
+        conf: set of identifiers of features to be extracted; from conf file
+
+    returns:
+        list of lists, #instances x #features = len(texts) x len(conf)
+    """
     all_features = len(conf) == 0
 
-    # we'll use global variables to pass the data around
-    global source_text
-    source_text = text
+    # use global variables to pass around data
+    global source_texts
+    source_texts = texts
+
     preprocess()
 
     # features will be list of lists
