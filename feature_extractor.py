@@ -114,7 +114,7 @@ def unique_words_ratio():
     (assuming they are stemmed correctly; 'eat' and 'ate' are still 'distinct');
     note that punctuation characters, parentheses etc. are treated as words
     """
-    return [len(set(text)) / len(text) for text in stemmed_texts]
+    return [[len(set(text)) / len(text) for text in stemmed_texts]]
 
 
 def words_per_sentence():
@@ -123,8 +123,8 @@ def words_per_sentence():
     uses the '.' POS tag to detect number of sentences to avoid treating '.' in
     abbreviations as sentence ends
     """
-    return [word_counts[i] / tagged_texts[i].count('.')
-            for i in range(0, len(word_counts))]
+    return [[word_counts[i] / tagged_texts[i].count('.')
+             for i in range(0, len(word_counts))]]
 
 
 def characters_per_words():
@@ -132,8 +132,8 @@ def characters_per_words():
 
     note that character count includes punctuation, parentheses etc.
     """
-    return [(len(source_texts[i]) - word_counts[i] + 1) / word_counts[i]
-            for i in range(0, len(word_counts))]
+    return [[(len(source_texts[i]) - word_counts[i] + 1) / word_counts[i]
+             for i in range(0, len(word_counts))]]
 
 
 # FILL IN OTHER FEATURE EXTRACTORS
