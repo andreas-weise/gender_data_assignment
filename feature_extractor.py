@@ -46,7 +46,7 @@ def preprocess():
     # remove rare words
     # vocab = nltk.FreqDist(w for w in line for line in stemmed_texts)
     vocab = nltk.FreqDist(w for text in stemmed_texts for w in text)
-    rare_words_list = vocab.hapaxes()
+    rare_words_list = [re.escape(word) for word in vocab.hapaxes()]
     rare_words_regex = re.compile(r'\b(%s)\b' % '|'.join(rare_words_list))
     stemmed_texts = [[rare_words_regex.sub('<RARE>', w) for w in text]
                      for text in stemmed_texts]
