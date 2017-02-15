@@ -3,6 +3,8 @@ import numpy
 import re
 from nltk.util import ngrams
 import operator
+import gensim
+import os
 
 # extract configured set of features from list of text instances
 
@@ -12,6 +14,7 @@ word_counts = []
 tokenized_texts = []
 tagged_texts = []
 stemmed_texts = []
+cropped_texts = []
 
 
 def preprocess():
@@ -52,6 +55,14 @@ def preprocess():
                      for text in stemmed_texts]
     # note: source_texts will be lower case, but only stemmed_texts will have
     # rare words removed
+
+    global cropped_texts
+    stop_list = nltk.corpus.stopwords.words('english')
+    stop_list.extend(['.', ',', ':', ';', '(', ')', '!', '?', '"', "'", "''",
+                      '``', '-', "'s", 'would', '[', ']', '{', '}', '...',
+                      'p.'])
+    cropped_texts = [[word for word in text if word not in stop_list]
+                     for text in tokenized_texts]
 
 
 def bag_of_function_words():
@@ -136,6 +147,25 @@ def characters_per_words():
              for i in range(0, len(word_counts))]]
 
 
+def topic_model_scores(num_topics):
+    """ returns, for the top num_topics topics (lsi), the score for each text
+
+    args:
+        num_topics: number of topics (features) to consider
+    """
+    global cropped_texts
+    dictionary = gensim.corpora.Dictionary(cropped_texts)
+    corpus = [dictionary.doc2bow(text) for text in cropped_texts]
+    tfidf = gensim.models.TfidfModel(corpus)
+    corpus_tfidf = tfidf[corpus]
+    lsi = gensim.models.lsimodel.LsiModel(corpus=corpus, id2word=dictionary,
+                                          num_topics=num_topics)
+    corpus_lsi = lsi[corpus_tfidf]
+
+    return [[scores[i][1] for scores in corpus_lsi]
+            for i in range(0, num_topics)]
+
+
 # FILL IN OTHER FEATURE EXTRACTORS
 # TODO topic models
 
@@ -162,7 +192,6 @@ def extract_features(texts, conf):
     # each component list will have the same length as the list of input text
     features = []
 
-    # extract requested features: TODO topic models
     if 'bag_of_function_words' in conf or all_features:
         features.extend(bag_of_function_words())
     if 'bag_of_pos_trigrams' in conf or all_features:
@@ -176,13 +205,15 @@ def extract_features(texts, conf):
     if 'bag_of_bigrams' in conf or all_features:
         features.extend(bag_of_ngrams(stemmed_texts, 2, 100))
     if 'bag_of_unigrams' in conf or all_features:
-        features.extend(bag_of_ngrams(stemmed_texts, 1, None))
+        features.extend(bag_of_ngrams(stemmed_texts, 1, 100))
     if 'characters_per_word' in conf or all_features:
         features.extend(characters_per_words())
     if 'unique_words_ratio' in conf or all_features:
         features.extend(unique_words_ratio())
     if 'words_per_sentence' in conf or all_features:
         features.extend(words_per_sentence())
+    if 'topic_model_scores' in conf or all_features:
+        features.extend(topic_model_scores(20))
 
     # transpose list of lists so its dimensions are #instances x #features
     return numpy.asarray(features).T.tolist()
