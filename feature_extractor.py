@@ -4,7 +4,7 @@ import re
 from nltk.util import ngrams
 import operator
 import gensim
-import os
+from collections import defaultdict
 
 # extract configured set of features from list of text instances
 
@@ -13,8 +13,9 @@ source_texts = []
 word_counts = []
 tokenized_texts = []
 tagged_texts = []
-stemmed_texts = []
 cropped_texts = []
+stemmed_texts = []
+stemmed_cropped_texts = []
 
 
 def preprocess():
@@ -31,9 +32,17 @@ def preprocess():
     tagged_texts = [[tag[1] for tag in nltk.pos_tag(text)]
                     for text in tokenized_texts]
 
+    global cropped_texts
+    stop_list = nltk.corpus.stopwords.words('english')
+    stop_list.extend(['.', ',', ':', ';', '(', ')', '!', '?', '"', "'", "''",
+                      '``', '-', "'s", 'would', '[', ']', '{', '}', '...',
+                      'p.'])
+    cropped_texts = [[word for word in text if word not in stop_list]
+                     for text in tokenized_texts]
+
     # stem using standard nltk porter stemmer
     porter = nltk.PorterStemmer()
-    global stemmed_texts
+    global stemmed_texts, stemmed_cropped_texts
     # stemmed_texts = [[porter.stem(t) for t in tokens]
     #                 for tokens in tokenized_texts]
     # iterating instead of list comprehension to allow exception handling
@@ -45,6 +54,14 @@ def preprocess():
             except IndexError:
                 stemmed_text.extend('')
         stemmed_texts.append(stemmed_text)
+    for tokens in cropped_texts:
+        stemmed_cropped_text = []
+        for t in tokens:
+            try:
+                stemmed_cropped_text.extend([porter.stem(t)])
+            except IndexError:
+                stemmed_cropped_text.extend('')
+        stemmed_cropped_texts.append(stemmed_cropped_text)
 
     # remove rare words
     # vocab = nltk.FreqDist(w for w in line for line in stemmed_texts)
@@ -55,14 +72,6 @@ def preprocess():
                      for text in stemmed_texts]
     # note: source_texts will be lower case, but only stemmed_texts will have
     # rare words removed
-
-    global cropped_texts
-    stop_list = nltk.corpus.stopwords.words('english')
-    stop_list.extend(['.', ',', ':', ';', '(', ')', '!', '?', '"', "'", "''",
-                      '``', '-', "'s", 'would', '[', ']', '{', '}', '...',
-                      'p.'])
-    cropped_texts = [[word for word in text if word not in stop_list]
-                     for text in tokenized_texts]
 
 
 def bag_of_function_words():
@@ -95,13 +104,13 @@ def bag_of_ngrams(texts, n=1, m=None):
 
     # count ngrams in dictionaries, one for each text, plus one for sums
     cnts = []
-    cnt_sum = {}
+    cnt_sum = defaultdict(int)
     for text in ngrammed_texts:
-        cnts.append({})
+        cnts.append(defaultdict(int))
         i = len(cnts) - 1
         for ngram in text:
-            cnts[i][ngram] = 1 + (cnts[i][ngram] if ngram in cnts[i] else 0)
-            cnt_sum[ngram] = 1 + (cnt_sum[ngram] if ngram in cnt_sum else 0)
+            cnts[i][ngram] += 1
+            cnt_sum[ngram] += 1
 
     # create list of lists of counts for each text for the most common ngrams
     # first, sort the ngrams by total counts
@@ -110,7 +119,7 @@ def bag_of_ngrams(texts, n=1, m=None):
     # then, create the bag of ngrams (up to m), normalized by word count
     bon = []
     for ngram, total in cnt_sorted:
-        counts = [(cnt[ngram] if ngram in cnt else 0) for cnt in cnts]
+        counts = [cnt[ngram] for cnt in cnts]
         counts = [counts[i] / word_counts[i] for i in range(0, len(counts))]
         bon.append(counts)
         if m and len(bon) >= m:
@@ -166,10 +175,6 @@ def topic_model_scores(num_topics):
             for i in range(0, num_topics)]
 
 
-# FILL IN OTHER FEATURE EXTRACTORS
-# TODO topic models
-
-
 def extract_features(texts, conf):
     """ extracts features in given conf from each text in given list of texts
 
@@ -205,7 +210,7 @@ def extract_features(texts, conf):
     if 'bag_of_bigrams' in conf or all_features:
         features.extend(bag_of_ngrams(stemmed_texts, 2, 100))
     if 'bag_of_unigrams' in conf or all_features:
-        features.extend(bag_of_ngrams(stemmed_texts, 1, 100))
+        features.extend(bag_of_ngrams(stemmed_cropped_texts, 1, 100))
     if 'characters_per_word' in conf or all_features:
         features.extend(characters_per_words())
     if 'unique_words_ratio' in conf or all_features:
