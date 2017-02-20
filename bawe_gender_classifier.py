@@ -7,44 +7,53 @@ import numpy
 import re
 import sys
 
-datadir = sys.argv[1]
-genderlabfile = datadir + "/BAWE_balanced_subset.csv"
-conffile = sys.argv[2]
 
-def load_balanced_gender_labels():
-	'''
-	Read the gender labels file and return dictionary mapping student id
-	to gender
-	'''
-	meta_lines = [line.rstrip().split(',') for line in open(genderlabfile)]
-	gender_dict = {row[0]:row[1] for row in meta_lines[1:]}
-	return gender_dict
+def main():
+    """ main function, called if module is run as main program"""
 
-def load_essays(gender_dict):
-	essays = []
-	genderlabels = []
-	students = []
-	for student, gender in gender_dict.items():
-		with open('%s/%s.txt' % (datadir, student)) as f:
-			text = f.read()
-			text = re.sub('<[^<]+?>', '', text)		# remove vestigial xml
-			essays.append(text)
-			genderlabels.append(gender)
-			students.append(student)
-	return essays, genderlabels, students
+    if len(sys.argv) == 1:
+        print('usage: bawe_gender_classifier.py <CORPUS_DIR> <CONF_FILE_NAME>')
+        exit(0)
+    data_dir = sys.argv[1]
 
-def load_conf_file():
-	conf = set(line.strip() for line in open(conffile))
-	return conf
+    # read file list into dictionary mapping file id to gender
+    with open(data_dir + '/BAWE_balanced_subset.csv', 'r') as gender_file:
+        meta_lines = [line.rstrip().split(',') for line in gender_file]
+        gender_dict = {row[0]: row[1] for row in meta_lines[1:]}
 
-def predict_gender(X, Y):
-	scores = cross_val_score(GaussianNB(), X, Y, scoring='accuracy', cv=10)
-	return scores.mean()
+    # read essay contents and gender labels into lists
+    essays = []
+    gender_labels = []
+    for student, gender in gender_dict.items():
+        with open('%s/%s.txt' % (data_dir, student)) as f:
+            text = f.read()
+            # remove vestigial xml
+            text = re.sub('<[^<]+?>', '', text)
+            essays.append(text)
+            gender_labels.append(gender)
+
+    # read conf file
+    if len(sys.argv) > 2:
+        with open(sys.argv[2]) as conf_file:
+            conf_all = set(line.strip() for line in conf_file)
+    else:
+        conf_all = []
+
+    # compute score, for each line in the config individually and all together
+    # note: preprocessing every time is very wasteful but i did not want to
+    #       change the feature_extractor interfaces from what was given
+    # each line individually
+    confs = [line for line in conf_all]
+    if len(conf_all) > 1:
+        # all lines together
+        confs.append([line for line in conf_all])
+    for conf in confs:
+        print('computing score for: %s... '
+              % (conf if conf else 'all features'), end='')
+        features = fe.extract_features(essays, conf)
+        print(cross_val_score(GaussianNB(), features, gender_labels,
+                              scoring='accuracy', cv=10).mean())
+
 
 if __name__ == "__main__":
-	gender_dict = load_balanced_gender_labels()
-	essays, genderlabels, students = load_essays(gender_dict)
-	conf = load_conf_file()
-	features = fe.extract_features(essays, conf)
-
-	print (predict_gender(features, genderlabels))
+    main()

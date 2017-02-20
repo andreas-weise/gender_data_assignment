@@ -185,39 +185,39 @@ def extract_features(texts, conf):
     returns:
         list of lists, #instances x #features = len(texts) x len(conf)
     """
-    all_features = len(conf) == 0
+    all_features = conf is None or len(conf) == 0
 
     # use global variables to pass around data
     global source_texts
-    source_texts = texts
-
-    preprocess()
+    if len(source_texts) == 0:
+        source_texts = texts
+        preprocess()
 
     # features will be list of lists
     # each component list will have the same length as the list of input text
     features = []
 
-    if 'bag_of_function_words' in conf or all_features:
+    if all_features or 'bag_of_function_words' in conf:
         features.extend(bag_of_function_words())
-    if 'bag_of_pos_trigrams' in conf or all_features:
+    if all_features or 'bag_of_pos_trigrams' in conf:
         features.extend(bag_of_ngrams(tagged_texts, 3, 500))
-    if 'bag_of_pos_bigrams' in conf or all_features:
+    if all_features or 'bag_of_pos_bigrams' in conf:
         features.extend(bag_of_ngrams(tagged_texts, 2, 100))
-    if 'bag_of_pos_unigrams' in conf or all_features:
+    if all_features or 'bag_of_pos_unigrams' in conf:
         features.extend(bag_of_ngrams(tagged_texts, 1, None))
-    if 'bag_of_trigrams' in conf or all_features:
+    if all_features or 'bag_of_trigrams' in conf:
         features.extend(bag_of_ngrams(stemmed_texts, 3, 500))
-    if 'bag_of_bigrams' in conf or all_features:
+    if all_features or 'bag_of_bigrams' in conf:
         features.extend(bag_of_ngrams(stemmed_texts, 2, 100))
-    if 'bag_of_unigrams' in conf or all_features:
+    if all_features or 'bag_of_unigrams' in conf:
         features.extend(bag_of_ngrams(stemmed_cropped_texts, 1, 100))
-    if 'characters_per_word' in conf or all_features:
+    if all_features or 'characters_per_word' in conf:
         features.extend(characters_per_words())
-    if 'unique_words_ratio' in conf or all_features:
+    if all_features or 'unique_words_ratio' in conf:
         features.extend(unique_words_ratio())
-    if 'words_per_sentence' in conf or all_features:
+    if all_features or 'words_per_sentence' in conf:
         features.extend(words_per_sentence())
-    if 'topic_model_scores' in conf or all_features:
+    if all_features or 'topic_model_scores' in conf:
         features.extend(topic_model_scores(20))
 
     # transpose list of lists so its dimensions are #instances x #features
