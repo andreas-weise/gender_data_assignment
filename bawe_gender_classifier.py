@@ -6,6 +6,7 @@ import feature_extractor as fe
 import numpy
 import re
 import sys
+import datetime
 
 
 def main():
@@ -51,8 +52,14 @@ def main():
         print('computing score for: %s... '
               % (conf if conf else 'all features'), end='')
         features = fe.extract_features(essays, conf)
-        print(cross_val_score(GaussianNB(), features, gender_labels,
-                              scoring='accuracy', cv=10).mean())
+        score = cross_val_score(GaussianNB(), features, gender_labels,
+                                scoring='accuracy', cv=10).mean()
+        score = round(score, 3)
+        print(score)
+        with open('experiments.csv', 'a') as f:
+            f.write(";".join(
+                ('{:%Y-%m-%d;%H:%M:%S}'.format(datetime.datetime.now()),
+                 str(conf), str(score), '\n')))
 
 
 if __name__ == "__main__":
