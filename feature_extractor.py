@@ -143,7 +143,9 @@ def words_per_sentence():
     uses the '.' POS tag to detect number of sentences to avoid treating '.' in
     abbreviations as sentence ends
     """
-    return [[word_counts[i] / tagged_texts[i].count('.')
+    return [[word_counts[i] /
+             (tagged_texts[i].count('.') if tagged_texts[i].count('.') > 0
+              else 1)
              for i in range(0, len(word_counts))]]
 
 

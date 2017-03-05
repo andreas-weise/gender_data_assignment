@@ -15,7 +15,7 @@ def main():
         raw_data = list(csv.reader(datafile))
         data = [line[-1] for line in raw_data if line[0] == 'GEN']
         labels = [line[1] for line in raw_data if line[0] == 'GEN']
-    print(data)
+
     # load config file
     with open('conf.txt') as conffile:
         conf_all = set(line.strip() for line in conffile)
