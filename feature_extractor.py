@@ -10,12 +10,14 @@ from collections import defaultdict
 
 # global variables to pass around data
 source_texts = []
+tokenized_texts_case = []
 word_counts = []
 tokenized_texts = []
 tagged_texts = []
 cropped_texts = []
 stemmed_texts = []
 stemmed_cropped_texts = []
+w2v_model = None
 
 
 def preprocess():
@@ -25,7 +27,9 @@ def preprocess():
     no args and no return because of use of global variables
     """
     # lower case, count words, tokenize, and tag
-    global source_texts, word_counts, tokenized_texts, tagged_texts
+    global tokenized_texts_case, source_texts, word_counts, tokenized_texts, \
+        tagged_texts
+    tokenized_texts_case = [nltk.word_tokenize(text) for text in source_texts]
     source_texts = [text.lower() for text in source_texts]
     word_counts = [len(text.split()) for text in source_texts]
     tokenized_texts = [nltk.word_tokenize(text) for text in source_texts]
@@ -72,6 +76,10 @@ def preprocess():
                      for text in stemmed_texts]
     # note: source_texts will be lower case, but only stemmed_texts will have
     # rare words removed
+
+    global w2v_model
+    w2v_model = gensim.models.Word2Vec.load_word2vec_format(
+        'GoogleNews-vectors-negative300.bin.gz', binary=True)
 
 
 def bag_of_function_words():
@@ -177,6 +185,15 @@ def topic_model_scores(num_topics):
             for i in range(0, num_topics)]
 
 
+def word2vec_avg():
+    """ returns the average word2vec vector for the words in each text """
+    return [[sum(w2v_model[token][i] for token in text if token in w2v_model) /
+             len(text)
+             # use texts in original case (google word2vec is case sensitive)
+             for text in tokenized_texts_case]
+            for i in range(0, w2v_model.vector_size)]
+
+
 def extract_features(texts, conf):
     """ extracts features in given conf from each text in given list of texts
 
@@ -221,6 +238,8 @@ def extract_features(texts, conf):
         features.extend(words_per_sentence())
     if all_features or 'topic_model_scores' in conf:
         features.extend(topic_model_scores(20))
+    if all_features or 'word2vec_avg' in conf:
+        features.extend(word2vec_avg())
 
     # transpose list of lists so its dimensions are #instances x #features
     return numpy.asarray(features).T.tolist()

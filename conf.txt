@@ -9,3 +9,4 @@ topic_model_scores
 characters_per_word
 unique_words_ratio
 words_per_sentence
+word2vec_avg
