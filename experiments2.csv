@@ -1,0 +1,15 @@
+2017-03-06;21:32:35;word2vec_avg;0.654;
+2017-03-06;21:32:38;characters_per_word;0.558;
+2017-03-06;21:33:42;bag_of_pos_trigrams;0.536;
+2017-03-06;21:33:44;unique_words_ratio;0.628;
+2017-03-06;21:33:48;words_per_sentence;0.565;
+2017-03-06;21:33:56;topic_model_scores;0.607;
+2017-03-06;21:35:24;word2vec_max_val;0.653;
+2017-03-06;21:35:47;bag_of_function_words;0.619;
+2017-03-06;21:36:02;bag_of_unigrams;0.567;
+2017-03-06;21:38:28;word2vec_avg_max_abs;0.666;
+2017-03-06;21:38:36;bag_of_pos_unigrams;0.512;
+2017-03-06;21:38:51;bag_of_bigrams;0.512;
+2017-03-06;21:39:57;bag_of_trigrams;0.508;
+2017-03-06;21:40:11;bag_of_pos_bigrams;0.615;
+2017-03-06;21:46:53;['word2vec_avg', 'characters_per_word', 'bag_of_pos_trigrams', 'unique_words_ratio', 'words_per_sentence', 'topic_model_scores', 'word2vec_max_val', 'bag_of_function_words', 'bag_of_unigrams', 'word2vec_avg_max_abs', 'bag_of_pos_unigrams', 'bag_of_bigrams', 'bag_of_trigrams', 'bag_of_pos_bigrams'];0.627;

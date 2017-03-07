@@ -10,3 +10,5 @@ characters_per_word
 unique_words_ratio
 words_per_sentence
 word2vec_avg
+word2vec_avg_max_abs
+word2vec_max_val

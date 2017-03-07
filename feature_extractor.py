@@ -5,6 +5,7 @@ from nltk.util import ngrams
 import operator
 import gensim
 from collections import defaultdict
+from math import sqrt
 
 # extract configured set of features from list of text instances
 
@@ -186,11 +187,36 @@ def topic_model_scores(num_topics):
 
 
 def word2vec_avg():
-    """ returns the average word2vec vector for the words in each text """
+    """ returns avg vector for words in each text """
     return [[sum(w2v_model[token][i] for token in text if token in w2v_model) /
              len(text)
              # use texts in original case (google word2vec is case sensitive)
              for text in tokenized_texts_case]
+            for i in range(0, w2v_model.vector_size)]
+
+
+def word2vec_max_val():
+    """ returns vector of max value for each dim for all words in each text """
+    return [[max(w2v_model[token][i] for token in text if token in w2v_model)
+             # use texts in original case (google word2vec is case sensitive)
+             for text in tokenized_texts_case]
+            for i in range(0, w2v_model.vector_size)]
+
+
+def word2vec_avg_max_abs(n=5):
+    """ returns avg of n vectors with max abs value for words in each text """
+    # compute absolute values for word vectors for words in each text
+    abs_vals = [[[w2v_model[token],
+                  sqrt(sum(val * val for val in w2v_model[token]))]
+                 for token in text if token in w2v_model]
+                for text in tokenized_texts_case]
+    # sort vectors within texts by absolute values
+    abs_vals_sorted = [sorted(vec_lst, key=operator.itemgetter(1), reverse=True)
+                       for vec_lst in abs_vals]
+    # return average of top n vectors for each text
+    return [[sum(vec_lst[j][0][i] for j in range(0, min(n, len(vec_lst)))) /
+             min(n, len(vec_lst))
+             for vec_lst in abs_vals_sorted]
             for i in range(0, w2v_model.vector_size)]
 
 
@@ -240,6 +266,10 @@ def extract_features(texts, conf):
         features.extend(topic_model_scores(20))
     if all_features or 'word2vec_avg' in conf:
         features.extend(word2vec_avg())
+    if all_features or 'word2vec_max_val' in conf:
+        features.extend(word2vec_max_val())
+    if all_features or 'word2vec_avg_max_abs' in conf:
+        features.extend(word2vec_avg_max_abs())
 
     # transpose list of lists so its dimensions are #instances x #features
     return numpy.asarray(features).T.tolist()
