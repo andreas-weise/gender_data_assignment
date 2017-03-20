@@ -6,9 +6,13 @@ import operator
 import gensim
 from collections import defaultdict
 from math import sqrt
+import json
+import requests
+import hashlib
+import time
+from operator import itemgetter
 
 # extract configured set of features from list of text instances
-
 # global variables to pass around data
 source_texts = []
 tokenized_texts_case = []
@@ -220,6 +224,56 @@ def word2vec_avg_max_abs(n=5):
             for i in range(0, w2v_model.vector_size)]
 
 
+def liwc_scores():
+    """ returns 93 liwc scores for each text"""
+    def get_liwc_scores(text):
+        """ aux function to handle the api call to liwc for a single text"""
+
+        api_key = '58d00611e53b0b05af5239d6'
+        api_secret = 'isYCnugw39h025UjvQe5ZCdCKhj1EgaAHjZjsIbPips'
+
+        # hash + timestamp as identifer for each text
+        # must be unique and texts apparently cannot be deleted after upload
+        text_index = '%s_%s' % (
+            hashlib.sha1(text.encode()).hexdigest(),
+            time.time())
+
+        headers = {
+            'X-API-KEY': api_key,
+            'X-API-SECRET-KEY': api_secret,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+
+        data = {
+            'name': text_index,
+            'person_handle': text_index,
+            'gender': 0,
+            'content': {
+                'language_content': text
+            }
+        }
+
+        response = requests.post('https://app.receptiviti.com/v2/api/person',
+                                 headers=headers, data=json.dumps(data))
+
+        if response.status_code != 200:
+            raise Exception('API call for LIWC scores failed!')
+
+        liwc_raw = response.json()['contents'][0]['liwc_scores']
+        # 7 keys directly contain a score, 1 key contains dict; flatten this
+        liwc_tuples = [(key, val) for (key, val) in liwc_raw.items()
+                       if key != 'categories']
+        liwc_tuples.extend([(key, val) for (key, val)
+                            in liwc_raw['categories'].items()])
+        # return just the scores, sorted by their keys
+        return [val for (key, val) in sorted(liwc_tuples, key=itemgetter(0))]
+
+    text_scores = [get_liwc_scores(text) for text in source_texts]
+    return [[scores[i] for scores in text_scores]
+            for i in range(0, len(text_scores[0]))]
+
+
 def extract_features(texts, conf):
     """ extracts features in given conf from each text in given list of texts
 
@@ -270,6 +324,8 @@ def extract_features(texts, conf):
         features.extend(word2vec_max_val())
     if all_features or 'word2vec_avg_max_abs' in conf:
         features.extend(word2vec_avg_max_abs())
+    if all_features or 'liwc_scores' in conf:
+        features.extend(liwc_scores())
 
     # transpose list of lists so its dimensions are #instances x #features
     return numpy.asarray(features).T.tolist()
