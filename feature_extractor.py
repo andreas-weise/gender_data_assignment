@@ -11,6 +11,8 @@ import requests
 import hashlib
 import time
 from operator import itemgetter
+import pickle
+import os
 
 # extract configured set of features from list of text instances
 # global variables to pass around data
@@ -31,9 +33,29 @@ def preprocess():
     puts words in lower case, tokenizes and stems them, and removes rare words
     no args and no return because of use of global variables
     """
+
+    global source_texts, tokenized_texts_case, word_counts, tokenized_texts, \
+        tagged_texts, cropped_texts, stemmed_texts, stemmed_cropped_texts
+
+    # load the processed texts from pickle dumps if those exist (check for one)
+    if os.path.exists('pickle/tokenized_texts_case.p'):
+        with open('pickle/tokenized_texts_case.p', 'rb') as p_file:
+            tokenized_texts_case = pickle.load(p_file)
+        with open('pickle/word_counts.p', 'rb') as p_file:
+            word_counts = pickle.load(p_file)
+        with open('pickle/tokenized_texts.p', 'rb') as p_file:
+            tokenized_texts = pickle.load(p_file)
+        with open('pickle/tagged_texts.p', 'rb') as p_file:
+            tagged_texts = pickle.load(p_file)
+        with open('pickle/cropped_texts.p', 'rb') as p_file:
+            cropped_texts = pickle.load(p_file)
+        with open('pickle/stemmed_texts.p', 'rb') as p_file:
+            stemmed_texts = pickle.load(p_file)
+        with open('pickle/stemmed_cropped_texts.p', 'rb') as p_file:
+            stemmed_cropped_texts = pickle.load(p_file)
+        return
+
     # lower case, count words, tokenize, and tag
-    global tokenized_texts_case, source_texts, word_counts, tokenized_texts, \
-        tagged_texts
     tokenized_texts_case = [nltk.word_tokenize(text) for text in source_texts]
     source_texts = [text.lower() for text in source_texts]
     word_counts = [len(text.split()) for text in source_texts]
@@ -41,7 +63,6 @@ def preprocess():
     tagged_texts = [[tag[1] for tag in nltk.pos_tag(text)]
                     for text in tokenized_texts]
 
-    global cropped_texts
     stop_list = nltk.corpus.stopwords.words('english')
     stop_list.extend(['.', ',', ':', ';', '(', ')', '!', '?', '"', "'", "''",
                       '``', '-', "'s", 'would', '[', ']', '{', '}', '...',
@@ -51,7 +72,6 @@ def preprocess():
 
     # stem using standard nltk porter stemmer
     porter = nltk.PorterStemmer()
-    global stemmed_texts, stemmed_cropped_texts
     # stemmed_texts = [[porter.stem(t) for t in tokens]
     #                 for tokens in tokenized_texts]
     # iterating instead of list comprehension to allow exception handling
@@ -82,9 +102,21 @@ def preprocess():
     # note: source_texts will be lower case, but only stemmed_texts will have
     # rare words removed
 
-    global w2v_model
-    w2v_model = gensim.models.Word2Vec.load_word2vec_format(
-        'GoogleNews-vectors-negative300.bin.gz', binary=True)
+    # dump the processed texts to pickle files for next time they are needed
+    with open('pickle/tokenized_texts_case.p', 'wb') as p_file:
+        pickle.dump(tokenized_texts_case, p_file)
+    with open('pickle/word_counts.p', 'wb') as p_file:
+        pickle.dump(word_counts, p_file)
+    with open('pickle/tokenized_texts.p', 'wb') as p_file:
+        pickle.dump(tokenized_texts, p_file)
+    with open('pickle/tagged_texts.p', 'wb') as p_file:
+        pickle.dump(tagged_texts, p_file)
+    with open('pickle/cropped_texts.p', 'wb') as p_file:
+        pickle.dump(cropped_texts, p_file)
+    with open('pickle/stemmed_texts.p', 'wb') as p_file:
+        pickle.dump(stemmed_texts, p_file)
+    with open('pickle/stemmed_cropped_texts.p', 'wb') as p_file:
+        pickle.dump(stemmed_cropped_texts, p_file)
 
 
 def bag_of_function_words():
@@ -112,7 +144,7 @@ def bag_of_ngrams(texts, n=1, m=None):
     returns:
         list of list of most common ngram counts, m x len(texts)
     """
-    # generate list of lists of nrams for all texts
+    # generate list of lists of ngrams for all texts
     ngrammed_texts = [list(ngrams(text, n)) for text in texts]
 
     # count ngrams in dictionaries, one for each text, plus one for sums
@@ -138,6 +170,11 @@ def bag_of_ngrams(texts, n=1, m=None):
         if m and len(bon) >= m:
             break
     return bon
+
+
+# def bag_of_char_ngrams(texts, n=1, m=None):
+#     """ returns counts of up to m overall most common character ngrams for
+# each given text"""
 
 
 def unique_words_ratio():
@@ -177,7 +214,6 @@ def topic_model_scores(num_topics):
     args:
         num_topics: number of topics (features) to consider
     """
-    global cropped_texts
     dictionary = gensim.corpora.Dictionary(cropped_texts)
     corpus = [dictionary.doc2bow(text) for text in cropped_texts]
     tfidf = gensim.models.TfidfModel(corpus)
@@ -278,12 +314,58 @@ def extract_features(texts, conf):
     """ extracts features in given conf from each text in given list of texts
 
     args:
-        text: list of texts (essays) from which to extract features
+        texts: list of texts from which to extract features
         conf: set of identifiers of features to be extracted; from conf file
 
     returns:
         list of lists, #instances x #features = len(texts) x len(conf)
     """
+    def load_or_compute(feature):
+        feat_data = []
+        if os.path.exists('pickle/%s.p' % feature):
+            with open('pickle/%s.p' % feature, 'rb') as p_file:
+                feat_data = pickle.load(p_file)
+        else:
+            if feature == 'bag_of_function_words':
+                feat_data = bag_of_function_words()
+            if feature == 'bag_of_pos_trigrams':
+                feat_data = bag_of_ngrams(tagged_texts, 3, 500)
+            if feature == 'bag_of_pos_bigrams':
+                feat_data = bag_of_ngrams(tagged_texts, 2, 100)
+            if feature == 'bag_of_pos_unigrams':
+                feat_data = bag_of_ngrams(tagged_texts, 1, None)
+            if feature == 'bag_of_trigrams':
+                feat_data = bag_of_ngrams(stemmed_texts, 3, 500)
+            if feature == 'bag_of_bigrams':
+                feat_data = bag_of_ngrams(stemmed_texts, 2, 100)
+            if feature == 'bag_of_unigrams':
+                feat_data = bag_of_ngrams(stemmed_cropped_texts, 1, 100)
+            if feature == 'characters_per_word':
+                feat_data = characters_per_words()
+            if feature == 'unique_words_ratio':
+                feat_data = unique_words_ratio()
+            if feature == 'words_per_sentence':
+                feat_data = words_per_sentence()
+            if feature == 'topic_model_scores':
+                feat_data = topic_model_scores(20)
+            if feature == 'word2vec_avg':
+                feat_data = word2vec_avg()
+            if feature == 'word2vec_max_val':
+                feat_data = word2vec_max_val()
+            if feature == 'word2vec_avg_max_abs':
+                feat_data = word2vec_avg_max_abs()
+            if feature == 'liwc_scores':
+                feat_data = liwc_scores()
+            if feature == 'char_unigram':
+                feat_data = bag_of_ngrams(source_texts, 1, 100)
+            if feature == 'char_bigram':
+                feat_data = bag_of_ngrams(source_texts, 2, 100)
+            if feature == 'char_trigram':
+                feat_data = bag_of_ngrams(source_texts, 3, 500)
+            with open('pickle/%s.p' % feature, 'wb') as p_file:
+                pickle.dump(feat_data, p_file)
+        return feat_data
+
     all_features = conf is None or len(conf) == 0
 
     # use global variables to pass around data
@@ -291,41 +373,29 @@ def extract_features(texts, conf):
     if len(source_texts) == 0:
         source_texts = texts
         preprocess()
+        global w2v_model
+        w2v_model = gensim.models.Word2Vec.load_word2vec_format(
+            'GoogleNews-vectors-negative300.bin.gz', binary=True)
+
+    # names of all supported features
+    supported_feats = ['bag_of_function_words', 'bag_of_pos_trigrams',
+                       'bag_of_pos_bigrams', 'bag_of_pos_unigrams',
+                       'bag_of_trigrams', 'bag_of_bigrams',
+                       'bag_of_unigrams', 'topic_model_scores',
+                       'characters_per_word', 'unique_words_ratio',
+                       'words_per_sentence', 'word2vec_avg',
+                       'word2vec_avg_max_abs', 'word2vec_max_val',
+                       'liwc_scores', 'char_unigram',
+                       'char_bigram', 'char_trigram']
 
     # features will be list of lists
     # each component list will have the same length as the list of input text
     features = []
 
-    if all_features or 'bag_of_function_words' in conf:
-        features.extend(bag_of_function_words())
-    if all_features or 'bag_of_pos_trigrams' in conf:
-        features.extend(bag_of_ngrams(tagged_texts, 3, 500))
-    if all_features or 'bag_of_pos_bigrams' in conf:
-        features.extend(bag_of_ngrams(tagged_texts, 2, 100))
-    if all_features or 'bag_of_pos_unigrams' in conf:
-        features.extend(bag_of_ngrams(tagged_texts, 1, None))
-    if all_features or 'bag_of_trigrams' in conf:
-        features.extend(bag_of_ngrams(stemmed_texts, 3, 500))
-    if all_features or 'bag_of_bigrams' in conf:
-        features.extend(bag_of_ngrams(stemmed_texts, 2, 100))
-    if all_features or 'bag_of_unigrams' in conf:
-        features.extend(bag_of_ngrams(stemmed_cropped_texts, 1, 100))
-    if all_features or 'characters_per_word' in conf:
-        features.extend(characters_per_words())
-    if all_features or 'unique_words_ratio' in conf:
-        features.extend(unique_words_ratio())
-    if all_features or 'words_per_sentence' in conf:
-        features.extend(words_per_sentence())
-    if all_features or 'topic_model_scores' in conf:
-        features.extend(topic_model_scores(20))
-    if all_features or 'word2vec_avg' in conf:
-        features.extend(word2vec_avg())
-    if all_features or 'word2vec_max_val' in conf:
-        features.extend(word2vec_max_val())
-    if all_features or 'word2vec_avg_max_abs' in conf:
-        features.extend(word2vec_avg_max_abs())
-    if all_features or 'liwc_scores' in conf:
-        features.extend(liwc_scores())
+    # for each feature, load pickle or compute values if there is no dump
+    for feat in supported_feats:
+        if all_features or feat in conf:
+            features.extend(load_or_compute(feat))
 
     # transpose list of lists so its dimensions are #instances x #features
     return numpy.asarray(features).T.tolist()
